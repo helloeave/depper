@@ -1,0 +1,15 @@
+options:
+  working_package: github.com/helloeave/depper/sample_deps
+
+rules:
+  - name: sample_deps
+    packages: sample_deps
+    may_depend:
+      - a
+    expected:
+      - sample_deps -> sample_deps/b
+
+  - name: sample_deps/a and sample_deps/b
+    packages: sample_deps/.*
+    may_depend:
+      - <.*>

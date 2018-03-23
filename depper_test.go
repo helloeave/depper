@@ -70,7 +70,7 @@ func graph() map[string]*pkg {
 	baz := pkg{name: "baz", dependsOn: make(map[string]*pkg)}
 
 	foo.dependsOn["bar"] = &bar
-	bar.dependsOn["bar"] = &baz
+	bar.dependsOn["baz"] = &baz
 
 	pkgs := map[string]*pkg{
 		"foo": &foo,

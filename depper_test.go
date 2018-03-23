@@ -15,6 +15,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"regexp"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -56,6 +57,186 @@ func (s *Zuite) TestCollectPackages() {
 	require.False(s.T(), deps[p("sample_deps/a")].goroot)
 	require.False(s.T(), deps[p("sample_deps/b")].goroot)
 	require.True(s.T(), deps["fmt"].goroot)
+}
+
+// graph returns fixture dependency graph:
+// packages: foo, bar, and baz
+// dependencies:
+// - foo -> bar
+// - bar -> baz
+func graph() map[string]*pkg {
+	foo := pkg{name: "foo", dependsOn: make(map[string]*pkg)}
+	bar := pkg{name: "bar", dependsOn: make(map[string]*pkg)}
+	baz := pkg{name: "baz", dependsOn: make(map[string]*pkg)}
+
+	foo.dependsOn["bar"] = &bar
+	bar.dependsOn["bar"] = &baz
+
+	pkgs := map[string]*pkg{
+		"foo": &foo,
+		"bar": &bar,
+		"baz": &baz,
+	}
+
+	return pkgs
+}
+
+func (s *Zuite) requireProcessRuleFullyAndCheck(r *rule, pkgs map[string]*pkg, pkgName string, expectedViolations []string) {
+	r.process(pkgs, pkgs[pkgName])
+	r.processMissingPackages()
+	require.Equalf(s.T(), expectedViolations, r.violations, "for package %s", pkgName)
+}
+
+func (s *Zuite) TestProcessRule_mayDependOnNothing() {
+	pkgs := graph()
+
+	cases := map[string][]string{
+		"foo": []string{
+			"- disallowed foo -> bar",
+		},
+		"bar": []string{
+			"- disallowed bar -> baz",
+		},
+		"baz": nil,
+	}
+	for pkgName, expectedViolations := range cases {
+		r := &rule{
+			mayDepends:              nil,
+			actualPackagesProcessed: make(map[string]bool),
+		}
+		s.requireProcessRuleFullyAndCheck(r, pkgs, pkgName, expectedViolations)
+	}
+}
+
+func (s *Zuite) TestProcessRule_mayDependOnBar() {
+	pkgs := graph()
+
+	cases := map[string][]string{
+		"foo": nil,
+		"bar": []string{
+			"- disallowed bar -> baz",
+		},
+		"baz": nil,
+	}
+	for pkgName, expectedViolations := range cases {
+		r := &rule{
+			mayDepends: []*pkgpattern{
+				&pkgpattern{pattern: regexp.MustCompile("bar")},
+			},
+			actualPackagesProcessed: make(map[string]bool),
+		}
+		s.requireProcessRuleFullyAndCheck(r, pkgs, pkgName, expectedViolations)
+	}
+}
+
+func (s *Zuite) TestProcessRule_mayDependOnNothingExpectedToDependOnBar() {
+	pkgs := graph()
+
+	cases := map[string][]string{
+		"foo": nil,
+		"bar": []string{
+			"- disallowed bar -> baz",
+		},
+		"baz": []string{
+			"- expected   baz -> bar",
+		},
+	}
+	for pkgName, expectedViolations := range cases {
+		r := &rule{
+			mayDepends: nil,
+			expectedStarToPackage: map[string]bool{
+				"bar": true,
+			},
+			actualPackagesProcessed: make(map[string]bool),
+		}
+		s.requireProcessRuleFullyAndCheck(r, pkgs, pkgName, expectedViolations)
+	}
+}
+
+func (s *Zuite) TestProcessRule_mayDependOnNothingExpectedToHaveFooDependingOnBar() {
+	pkgs := graph()
+
+	cases := map[string][]string{
+		"foo": nil,
+		"bar": []string{
+			"- disallowed bar -> baz",
+			"- missing    foo",
+		},
+		"baz": []string{
+			"- missing    foo",
+		},
+	}
+	for pkgName, expectedViolations := range cases {
+		r := &rule{
+			mayDepends: nil,
+			expectedPackageToPackage: map[string]map[string]bool{
+				"foo": map[string]bool{
+					"bar": true,
+				},
+			},
+			actualPackagesProcessed: make(map[string]bool),
+		}
+		s.requireProcessRuleFullyAndCheck(r, pkgs, pkgName, expectedViolations)
+	}
+}
+
+func (s *Zuite) TestProcessRule_mayDependOnBazExpectedToHaveFooDependingOnBar() {
+	pkgs := graph()
+
+	cases := map[string][]string{
+		"foo": nil,
+		"bar": []string{
+			"- missing    foo",
+		},
+		"baz": []string{
+			"- missing    foo",
+		},
+	}
+	for pkgName, expectedViolations := range cases {
+		r := &rule{
+			mayDepends: []*pkgpattern{
+				&pkgpattern{pattern: regexp.MustCompile("baz")},
+			},
+			expectedPackageToPackage: map[string]map[string]bool{
+				"foo": map[string]bool{
+					"bar": true,
+				},
+			},
+			actualPackagesProcessed: make(map[string]bool),
+		}
+		s.requireProcessRuleFullyAndCheck(r, pkgs, pkgName, expectedViolations)
+	}
+}
+
+func (s *Zuite) TestProcessRule_mayDependOnBarAndBazExpectedToHaveQuxDependingOnBar() {
+	pkgs := graph()
+
+	cases := map[string][]string{
+		"foo": []string{
+			"- missing    qux",
+		},
+		"bar": []string{
+			"- missing    qux",
+		},
+		"baz": []string{
+			"- missing    qux",
+		},
+	}
+	for pkgName, expectedViolations := range cases {
+		r := &rule{
+			mayDepends: []*pkgpattern{
+				&pkgpattern{pattern: regexp.MustCompile("bar")},
+				&pkgpattern{pattern: regexp.MustCompile("baz")},
+			},
+			expectedPackageToPackage: map[string]map[string]bool{
+				"qux": map[string]bool{
+					"bar": true,
+				},
+			},
+			actualPackagesProcessed: make(map[string]bool),
+		}
+		s.requireProcessRuleFullyAndCheck(r, pkgs, pkgName, expectedViolations)
+	}
 }
 
 type Zuite struct {

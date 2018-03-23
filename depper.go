@@ -279,11 +279,17 @@ nextPkg:
 		rule.violations = append(rule.violations, fmt.Sprintf("- disallowed %s -> %s", pkg, bad))
 	}
 	for expected, _ := range rule.expectedStarToPackage {
+		if expected == pkg.name {
+			continue
+		}
 		if !starActuals[expected] {
 			rule.violations = append(rule.violations, fmt.Sprintf("- expected   %s -> %s", pkg, expected))
 		}
 	}
 	for expected, _ := range rule.expectedPackageToPackage[pkg.name] {
+		if expected == pkg.name {
+			continue
+		}
 		if !specificActuals[expected] {
 			rule.violations = append(rule.violations, fmt.Sprintf("- expected   %s -> %s", pkg, expected))
 		}

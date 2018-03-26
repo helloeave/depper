@@ -14,12 +14,12 @@ rules:
       - third_parties
       - config
       - .*util
-    expected:
+    deprecated_dependencies:
       - util/old_and_clunky -> server
       - old_common
 ```
 
-Each rule applies to a set of `packages`, and you can describe allowed dependencies i.e. `may_depend`, as well as know exceptions i.e. `expected`.
+Each rule applies to a set of `packages`, and you can describe allowed dependencies i.e. `may_depend`, as well as know deprecated dependencies i.e. `deprecated_dependencies`.
 
 Each `may_depend` entry is a set of packages. It can be
 - A specific package, i.e. `foo`; or
@@ -27,6 +27,15 @@ Each `may_depend` entry is a set of packages. It can be
 - Using `<pattern>` indicates matching against standard library packages; and
 - The special `third_parties` matches any third party package
 
-The known exceptions `expected` can be
+The known `deprecated_dependencies` can be
 - Generic e.g. `bar` meaning that in the set of packages, some are known to depend on package `bar`, or
 - Specific e.g. `foo -> bar` indicating `foo` is known to depend on `bar`.
+
+## Configuration
+
+You need to tell `depper` what is the working package, i.e. what the `.` package is
+
+```
+config:
+  working_package: github.com/helloeave/depper/sample_deps
+```

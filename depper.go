@@ -24,9 +24,9 @@ import (
 )
 
 type defs struct {
-	Options struct {
+	Config struct {
 		WorkingPackage string `yaml:"working_package"`
-	} `yaml:"options"`
+	} `yaml:"config"`
 	Rules []*rule `yaml:"rules"`
 }
 
@@ -34,7 +34,7 @@ type rule struct {
 	Name      string   `yaml:"name"`
 	Packages  string   `yaml:"packages"`
 	MayDepend []string `yaml:"may_depend"`
-	Expected  []string `yaml:"expected"`
+	Expected  []string `yaml:"deprecated_dependencies"`
 
 	// fields denormalized on parse
 	packagePattern           *regexp.Regexp
@@ -135,20 +135,20 @@ func parse(input []byte) (*defs, error) {
 		return nil, err
 	}
 
-	// options
-	if strings.HasSuffix(defs.Options.WorkingPackage, "/") {
-		return nil, fmt.Errorf("must be package import path, was %s", defs.Options.WorkingPackage)
+	// configuration
+	if strings.HasSuffix(defs.Config.WorkingPackage, "/") {
+		return nil, fmt.Errorf("must be package import path, was %s", defs.Config.WorkingPackage)
 	}
 
 	// process all rules
 	for _, rule := range defs.Rules {
 		var err error
-		rule.packagePattern, err = regexp.Compile("^" + defs.Options.WorkingPackage + "/" + rule.Packages + "$")
+		rule.packagePattern, err = regexp.Compile("^" + defs.Config.WorkingPackage + "/" + rule.Packages + "$")
 		if err != nil {
 			return nil, err
 		}
 		for _, expr := range rule.MayDepend {
-			set, err := compilePkgpattern(defs.Options.WorkingPackage, expr)
+			set, err := compilePkgpattern(defs.Config.WorkingPackage, expr)
 			if err != nil {
 				return nil, err
 			}
@@ -159,10 +159,10 @@ func parse(input []byte) (*defs, error) {
 		for _, expected := range rule.Expected {
 			parts := strings.Split(expected, "->")
 			if l := len(parts); l == 1 {
-				rule.expectedStarToPackage[defs.Options.WorkingPackage+"/"+expected] = true
+				rule.expectedStarToPackage[defs.Config.WorkingPackage+"/"+expected] = true
 			} else if l == 2 {
-				parent := defs.Options.WorkingPackage + "/" + strings.TrimSpace(parts[0])
-				child := defs.Options.WorkingPackage + "/" + strings.TrimSpace(parts[1])
+				parent := defs.Config.WorkingPackage + "/" + strings.TrimSpace(parts[0])
+				child := defs.Config.WorkingPackage + "/" + strings.TrimSpace(parts[1])
 				if _, ok := rule.expectedPackageToPackage[parent]; !ok {
 					rule.expectedPackageToPackage[parent] = make(map[string]bool)
 				}
@@ -338,7 +338,7 @@ func (defs *defs) _collectPackages(pkgs map[string]*pkg, root string, pkgName st
 	}
 
 	// Don't worry about dependencies for non working packages
-	if !strings.HasPrefix(pkgName, defs.Options.WorkingPackage) {
+	if !strings.HasPrefix(pkgName, defs.Config.WorkingPackage) {
 		return nil
 	}
 

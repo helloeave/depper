@@ -1,4 +1,4 @@
-options:
+config:
   working_package: github.com/helloeave/depper/sample_deps
 
 rules:
@@ -6,7 +6,7 @@ rules:
     packages: sample_deps
     may_depend:
       - a
-    expected:
+    deprecated_dependencies:
       - sample_deps -> sample_deps/b
 
   - name: sample_deps/a and sample_deps/b

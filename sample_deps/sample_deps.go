@@ -13,8 +13,8 @@
 package sample_deps
 
 import (
-	"github.com/helloeave/depper/sample_deps/a"
-	"github.com/helloeave/depper/sample_deps/b"
+	"github.com/homelight/depper/sample_deps/a"
+	"github.com/homelight/depper/sample_deps/b"
 )
 
 func depend_on_a(_ *a.A) {

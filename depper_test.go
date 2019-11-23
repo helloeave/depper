@@ -255,5 +255,5 @@ func TestRunAllTheTests(t *testing.T) {
 }
 
 func p(name string) string {
-	return fmt.Sprintf("github.com/homelight/depper/%s", name)
+	return fmt.Sprintf("github.com/helloeave/depper/%s", name)
 }

@@ -14,12 +14,13 @@ package main
 
 import (
 	"fmt"
-	"go/build"
 	"io/ioutil"
 	"os"
 	"regexp"
+	"runtime"
 	"strings"
 
+	"golang.org/x/tools/go/packages"
 	"gopkg.in/yaml.v2"
 )
 
@@ -304,6 +305,10 @@ func (rule *rule) processMissingPackages() {
 	}
 }
 
+func isGoroot(goPkg *packages.Package) bool {
+	return strings.HasPrefix(goPkg.GoFiles[0], runtime.GOROOT())
+}
+
 func (defs *defs) collectPackages(root string) (map[string]*pkg, error) {
 	pkgs := make(map[string]*pkg)
 	if err := defs._collectPackages(pkgs, root, ".", 0); err != nil {
@@ -317,23 +322,29 @@ func (defs *defs) _collectPackages(pkgs map[string]*pkg, root string, pkgName st
 		return nil
 	}
 
-	goPkg, err := build.Default.Import(pkgName, root, 0)
+	cfg := &packages.Config{
+		Mode: packages.NeedName | packages.NeedImports | packages.NeedFiles,
+		Dir:  root,
+	}
+
+	goPkgs, err := packages.Load(cfg, pkgName)
 	if err != nil {
 		return fmt.Errorf("failed to import %s: %s", pkgName, err)
 	}
+	goPkg := goPkgs[0]
 	if pkgName == "." {
-		pkgName = goPkg.ImportPath
+		pkgName = goPkg.ID
 	}
 
 	pkg := pkg{
 		name:      pkgName,
-		goroot:    goPkg.Goroot,
+		goroot:    isGoroot(goPkg),
 		dependsOn: make(map[string]*pkg),
 	}
 	pkgs[pkgName] = &pkg
 
 	// Don't worry about dependencies for stdlib packages
-	if goPkg.Goroot {
+	if pkg.goroot {
 		return nil
 	}
 
@@ -354,19 +365,19 @@ func (defs *defs) _collectPackages(pkgs map[string]*pkg, root string, pkgName st
 	return nil
 }
 
-func getImports(goPkg *build.Package) []string {
+func getImports(goPkg *packages.Package) []string {
 	var imports []string
 	found := make(map[string]bool)
-	for _, imp := range goPkg.Imports {
-		if imp == goPkg.ImportPath {
+	for key := range goPkg.Imports {
+		if key == goPkg.ID {
 			// Don't draw a self-reference when foo_test depends on foo.
 			continue
 		}
-		if found[imp] {
+		if found[key] {
 			continue
 		}
-		found[imp] = true
-		imports = append(imports, imp)
+		found[key] = true
+		imports = append(imports, key)
 	}
 	return imports
 }

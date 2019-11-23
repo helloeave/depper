@@ -12,7 +12,7 @@
 
 package b
 
-import "github.com/homelight/depper/sample_deps/a"
+import "github.com/helloeave/depper/sample_deps/a"
 
 type B string
 
